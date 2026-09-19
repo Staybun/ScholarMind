@@ -1,0 +1,119 @@
+server:
+  port: 9900
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+file:
+  upload:
+    path: ./papers
+    allowed-extensions: pdf,txt,md,markdown
+
+milvus:
+  host: localhost
+  port: 19530
+  username: ""
+  password: ""
+  database: default
+  timeout: 10000
+
+# Spring AI Alibaba DashScope 配置
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/scholarmind-runtime;MODE=MySQL;AUTO_SERVER=TRUE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: false
+  data:
+    redis:
+      repositories:
+        enabled: false
+      host: ${SCHOLARMIND_REDIS_HOST:localhost}
+      port: ${SCHOLARMIND_REDIS_PORT:6379}
+      password: ${SCHOLARMIND_REDIS_PASSWORD:}
+      connect-timeout: 500ms
+      timeout: 500ms
+  ai:
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:your-api-key-here}  # 从环境变量读取或使用默认值
+      chat:
+        options:
+          timeout: 180000  # 超时时间180秒（3分钟）
+      retry:
+        max-attempts: 3  # 最大重试次数
+        backoff:
+          initial-interval: 2000  # 初始重试间隔2秒
+          multiplier: 2  # 重试间隔倍数
+          max-interval: 10000  # 最大重试间隔10秒
+    
+    # Spring AI MCP 客户端基础配置。
+    # 默认关闭，避免未安装 Node/Docker/uv 或缺少 GitHub token 时影响本地启动。
+    # 需要外部 MCP 工具时使用 profile 启动：--spring.profiles.active=mcp
+    mcp:
+      client:
+        enabled: ${SCHOLARMIND_MCP_ENABLED:false}
+        name: scholarmind-mcp-client
+        version: 1.0.0
+        request-timeout: 60s
+        type: SYNC
+        toolcallback:
+          enabled: true
+
+# 阿里云 DashScope Embedding API 配置
+dashscope:
+  api:
+    key: ${DASHSCOPE_API_KEY:your-api-key-here}  # 从环境变量读取或使用默认值（用于自定义配置）
+  embedding:
+    model: text-embedding-v4  # 阿里云文本向量化模型
+
+# 论文文档分片配置
+document:
+  chunk:
+    max-size: 1200  # 每个分片最大字符数
+    overlap: 150   # 分片之间的重叠字符数
+
+# RAG 配置
+rag:
+  top-k: 5  # 检索返回的最相似论文片段数量
+  model: "qwen3-max"  # 大语言模型名称
+
+scholarmind:
+  context:
+    max-tokens: 16000
+    output-reserve: 2000
+    tool-reserve: 3000
+    max-history-messages: 12
+    summary-tokens: 1200
+    summary-model-enabled: true
+    rag-top-k: 3
+  memory:
+    working:
+      enabled: true
+      ttl-seconds: 86400
+    semantic:
+      enabled: true
+      collection: scholarmind_semantic_memories
+      dimension: 1024
+      top-k: 5
+      min-score: 0.35
+  runtime:
+    retry:
+      max-attempts: 3
+      initial-backoff-ms: 1000
+      multiplier: 2.0
+      max-backoff-ms: 5000
+  workspace:
+    root: .
+    max-read-chars: 12000
+    max-search-results: 20
+  skills:
+    root: ./skills
