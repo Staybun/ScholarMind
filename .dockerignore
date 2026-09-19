@@ -1,0 +1,12 @@
+**
+!pom.xml
+!src/
+!src/**
+!skills/
+!skills/**
+!LICENSE
+!Dockerfile
+.env
+.env.*
+**/*.pem
+**/*.key

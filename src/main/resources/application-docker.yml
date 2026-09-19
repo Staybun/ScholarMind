@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:h2:file:/app/data/scholarmind-runtime;MODE=MySQL
+  data:
+    redis:
+      host: ${SCHOLARMIND_REDIS_HOST:redis}
+  ai:
+    mcp:
+      client:
+        enabled: false
+
+milvus:
+  host: ${MILVUS_HOST:milvus}
+  port: ${MILVUS_PORT:19530}
+
+file:
+  upload:
+    path: /app/papers
+
+scholarmind:
+  workspace:
+    root: /app/workspace
+  skills:
+    root: /app/skills
