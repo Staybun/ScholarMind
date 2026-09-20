@@ -10,6 +10,7 @@ import org.example.memory.semantic.SemanticMemoryRetriever;
 import org.example.memory.semantic.SemanticMemoryService;
 import org.example.memory.working.WorkingMemoryItem;
 import org.example.runtime.model.AgentRunRequest;
+import org.example.service.HybridSearchService;
 import org.example.service.VectorSearchService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,14 +32,14 @@ public class ContextManager {
     private final SemanticMemoryRetriever memories;
     private final SemanticMemoryService memoryService;
     private final SkillContextSelector skills;
-    private final ObjectProvider<VectorSearchService> rag;
+    private final ObjectProvider<HybridSearchService> rag;
     private final int memoryTopK;
     private final ReentrantLock[] locks = new ReentrantLock[64];
 
     public ContextManager(ContextManagerConfig config, TokenEstimator estimator, TokenBudgetAllocator allocator,
             ContextAssembler assembler, ContextCompactService compact, ConversationMemoryService conversations,
             SemanticMemoryRetriever memories, SemanticMemoryService memoryService, SkillContextSelector skills,
-            ObjectProvider<VectorSearchService> rag,
+            ObjectProvider<HybridSearchService> rag,
             @Value("${scholarmind.memory.semantic.top-k:5}") int memoryTopK) {
         this.config = config; this.estimator = estimator; this.allocator = allocator; this.assembler = assembler;
         this.compact = compact; this.conversations = conversations; this.memories = memories;
@@ -77,7 +78,7 @@ public class ContextManager {
             catch (Exception e) { selected = List.of(); warnings.add("SKILL_UNAVAILABLE"); }
             List<VectorSearchService.SearchResult> evidence = List.of();
             if (shouldRetrievePapers(request.getInput())) {
-                try { evidence = rag.getObject().searchSimilarDocuments(request.getInput(), Math.max(1, Math.min(10, config.getRagTopK()))); }
+                try { evidence = rag.getObject().search(request.getInput(), Math.max(1, Math.min(10, config.getRagTopK()))); }
                 catch (Exception e) { warnings.add("RAG_UNAVAILABLE_USE_TOOL_OR_REPORT_INSUFFICIENT_EVIDENCE"); }
             }
             Map<String, String> sections = new LinkedHashMap<>();

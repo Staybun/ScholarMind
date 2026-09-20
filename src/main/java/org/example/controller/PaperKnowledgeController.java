@@ -2,6 +2,7 @@ package org.example.controller;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.example.service.HybridSearchService;
 import org.example.service.VectorSearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,7 +22,7 @@ import java.util.List;
 public class PaperKnowledgeController {
 
     @Autowired
-    private VectorSearchService vectorSearchService;
+    private HybridSearchService hybridSearchService;
 
     @Value("${rag.top-k:5}")
     private int defaultTopK;
@@ -36,7 +37,7 @@ public class PaperKnowledgeController {
 
         int actualTopK = topK == null || topK <= 0 ? defaultTopK : Math.min(topK, 20);
         List<VectorSearchService.SearchResult> results =
-                vectorSearchService.searchSimilarDocuments(query.trim(), actualTopK);
+                hybridSearchService.search(query.trim(), actualTopK);
 
         return ResponseEntity.ok(ApiResponse.success(results));
     }

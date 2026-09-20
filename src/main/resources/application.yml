@@ -85,6 +85,12 @@ document:
 rag:
   top-k: 5  # 检索返回的最相似论文片段数量
   model: "qwen3-max"  # 大语言模型名称
+  hybrid:
+    enabled: true
+    candidate-top-k: 20
+    rrf-k: 60
+    rerank-top-k: 12
+    rerank-rrf-weight: 0.7
 
 scholarmind:
   context:

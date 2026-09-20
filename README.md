@@ -7,7 +7,7 @@ ScholarMind 面向科研论文研读与实验复现规划，提供论文知识�
 | 功能 | 实现位置与范围 |
 | --- | --- |
 | Agent Runtime Harness | `runtime/`：Run 状态、持久化 Checkpoint、Resume、Retry、Trace |
-| 论文知识库 | `service/`：PDF、Markdown、TXT 解析，分片、向量化、Milvus 向量检索与 RAG |
+| 论文知识库 | `service/`：PDF、Markdown、TXT 解析，分片、向量化、BM25 + Milvus 混合检索、重排序与 RAG |
 | 单 Agent 与多 Agent | ReAct、Plan-Execute 执行器；Supervisor 协调论文检索、研究问答、实验规划 Agent |
 | MCP 与 Skills | 文件系统、GitHub、arXiv MCP 配置；论文阅读与实验复现 Skills |
 | 上下文与记忆 | `context/`、`memory/`：Token Budget、滑动窗口、历史摘要、Redis 工作记忆、持久化会话及语义记忆 |
@@ -37,8 +37,6 @@ Dockerfile 使用 Maven / Java 17 多阶段构建，构建时执行现有测试�
 | `SCHOLARMIND_BIND_ADDRESS` | `127.0.0.1` | 宿主机监听地址 |
 | `SCHOLARMIND_PORT` | `9900` | Web 访问端口 |
 | `JAVA_TOOL_OPTIONS` | `-XX:MaxRAMPercentage=70.0` | JVM 参数 |
-
-默认仅本机可访问，数据库不映射宿主机端口。应用目前没有用户认证；对外服务前需配置认证与 HTTPS 反向代理，再按需调整监听地址。MinIO 默认凭据仅用于 Compose 内部网络，与现有 Milvus 配置匹配。
 
 ### 数据与常用操作
 
@@ -75,6 +73,26 @@ Skills 已打包进镜像，修改后重新构建即可生效。Agent 工作目�
 - 端口被占用：修改 `.env` 的 `SCHOLARMIND_PORT`，重新运行启动命令。
 - 自定义宿主机目录挂载出现权限错误：确保应用 UID 10001 对数据目录有写权限。
 - 仅在宿主机运行 Java 应用时，继续使用下面的 `vector-database.yml` 流程；完整容器部署使用本节 `compose.yaml`，两套数据相互独立。
+
+## 混合检索与重排序
+
+论文检索默认启用三段式链路：Milvus 稠密向量召回、内置 BM25 关键词召回、RRF（Reciprocal Rank Fusion）融合，然后对融合候选进行本地词项覆盖与完整短语匹配重排序。结果包含 `retrievalSources`、`denseRank`、`keywordRank`、`denseScore`、`keywordScore`、`fusionScore`、`rerankScore` 字段；`score` 为最终重排序分数，数值越高排名越靠前。
+
+BM25 索引在每次论文上传并完成向量入库后更新，服务启动时也会根据 `papers/` 目录中的论文重建。因此，升级后重启服务即可为保留在上传目录中的旧论文补齐关键词索引；仅存在于 Milvus、但已不在上传目录中的旧数据不会进入 BM25 索引。
+
+```yaml
+rag:
+  hybrid:
+    enabled: true          # false 时回退为仅 Milvus 向量检索
+    candidate-top-k: 20    # 每个召回器的候选数
+    rrf-k: 60              # RRF 常数
+    rerank-top-k: 12       # 参与重排序的融合候选数
+    rerank-rrf-weight: 0.7 # 最终分数中 RRF 的权重，剩余部分为词项匹配分数
+```
+
+`GET /api/papers/search?query=...&topK=...`、RAG 问答、Agent 的论文知识库工具和 Runtime 上下文证据均使用该混合链路。向量数据库或 Embedding 服务不可用时，系统会记录告警并返回可用的 BM25 结果；BM25 本身依赖上传目录中的可解析论文。
+
+当前重排序器是本地、可解释的词法重排序器，不依赖额外模型 API。若后续接入 cross-encoder 或云端 reranker，应将其作为该融合候选集合的替代重排序实现，并保留证据字段。
 
 ## 本地运行
 

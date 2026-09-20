@@ -31,7 +31,7 @@ public class RagService {
     private static final Logger logger = LoggerFactory.getLogger(RagService.class);
 
     @Autowired
-    private VectorSearchService vectorSearchService;
+    private HybridSearchService hybridSearchService;
 
     @Value("${dashscope.api.key}")
     private String apiKey;
@@ -77,9 +77,9 @@ public class RagService {
         try {
             logger.info("收到论文 RAG 流式查询: {}", question);
 
-            // 1. 从向量数据库检索相关文档
+            // 1. 混合检索：向量召回与 BM25 关键词召回融合后再重排序
             List<VectorSearchService.SearchResult> searchResults = 
-                vectorSearchService.searchSimilarDocuments(question, topK);
+                hybridSearchService.search(question, topK);
 
             // 发送检索结果
             callback.onSearchResults(searchResults);
@@ -122,7 +122,7 @@ public class RagService {
                 }
                 context.append("\n");
             }
-            context.append("相似度距离: ").append(result.getScore()).append("\n");
+            context.append("混合检索分数: ").append(result.getScore()).append("\n");
             context.append(result.getContent()).append("\n\n");
         }
         

@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -45,6 +46,9 @@ public class VectorIndexService {
 
     @Autowired
     private PaperDocumentParserService paperDocumentParserService;
+
+    @Autowired
+    private KeywordSearchService keywordSearchService;
 
     @Value("${file.upload.path}")
     private String uploadPath;
@@ -170,6 +174,9 @@ public class VectorIndexService {
             }
         }
 
+        // Keep the local BM25 corpus in sync only after all dense vectors are stored.
+        keywordSearchService.replaceDocument(path.toString(), chunks);
+
         logger.info("论文索引完成: {}, 共 {} 个分片", filePath, chunks.size());
     }
 
@@ -286,7 +293,7 @@ public class VectorIndexService {
 
             // 生成唯一 ID（使用 _source + 分片索引）
             String source = (String) metadata.get("_source");
-            String id = UUID.nameUUIDFromBytes((source + "_" + chunkIndex).getBytes()).toString();
+            String id = UUID.nameUUIDFromBytes((source + "_" + chunkIndex).getBytes(StandardCharsets.UTF_8)).toString();
 
             // 构建字段数据
             List<InsertParam.Field> fields = new ArrayList<>();

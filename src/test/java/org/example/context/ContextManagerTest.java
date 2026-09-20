@@ -8,7 +8,7 @@ import org.example.memory.semantic.*;
 import org.example.memory.working.WorkingMemoryItem;
 import org.example.runtime.model.AgentRunRequest;
 import org.example.service.AgentModelFactory;
-import org.example.service.VectorSearchService;
+import org.example.service.HybridSearchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import java.util.ArrayList;
@@ -52,7 +52,7 @@ class ContextManagerTest {
                 new SemanticMemoryRetriever.MemoryHit("m1", "Prefer CIFAR dataset", "prior-session", .8f, "VECTOR")), false));
         SkillContextSelector skills = mock(SkillContextSelector.class);
         when(skills.select(anyString())).thenReturn(List.of(new SkillContextSelector.SelectedSkill("experiment-reproduction", "Verify data and metrics")));
-        ObjectProvider<VectorSearchService> rag = mock(ObjectProvider.class);
+        ObjectProvider<HybridSearchService> rag = mock(ObjectProvider.class);
         when(rag.getObject()).thenThrow(new IllegalStateException("offline"));
         ContextManager manager = new ContextManager(config, estimator, new TokenBudgetAllocator(), new ContextAssembler(estimator),
                 compact, conversations, retriever, mock(SemanticMemoryService.class), skills, rag, 5);

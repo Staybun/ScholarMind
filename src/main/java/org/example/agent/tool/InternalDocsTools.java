@@ -1,6 +1,7 @@
 package org.example.agent.tool;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.service.HybridSearchService;
 import org.example.service.VectorSearchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +26,7 @@ public class InternalDocsTools {
     public static final String TOOL_QUERY_INTERNAL_DOCS = "queryInternalDocs";
     public static final String TOOL_QUERY_PAPER_KNOWLEDGE = "queryPaperKnowledge";
     
-    private final VectorSearchService vectorSearchService;
+    private final HybridSearchService hybridSearchService;
     
     @Value("${rag.top-k:3}")
     private int topK = 3; // 默认值
@@ -34,11 +35,11 @@ public class InternalDocsTools {
     
     /**
      * 构造函数注入依赖
-     * Spring 会自动注入 VectorSearchService
+     * Spring 会自动注入 HybridSearchService
      */
     @Autowired
-    public InternalDocsTools(VectorSearchService vectorSearchService) {
-        this.vectorSearchService = vectorSearchService;
+    public InternalDocsTools(HybridSearchService hybridSearchService) {
+        this.hybridSearchService = hybridSearchService;
     }
     
     /**
@@ -59,7 +60,7 @@ public class InternalDocsTools {
         try {
             // 使用向量搜索服务检索相关文档
             List<VectorSearchService.SearchResult> searchResults = 
-                    vectorSearchService.searchSimilarDocuments(query, topK);
+                    hybridSearchService.search(query, topK);
             
             if (searchResults.isEmpty()) {
                 return "{\"status\": \"no_results\", \"message\": \"No relevant paper chunks found in ScholarMind knowledge base.\"}";

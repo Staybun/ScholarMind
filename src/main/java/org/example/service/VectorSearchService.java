@@ -146,6 +146,13 @@ public class VectorSearchService {
         private int pageStart;
         private int pageEnd;
         private int chunkIndex;
+        private Integer denseRank;
+        private Integer keywordRank;
+        private Double denseScore;
+        private Double keywordScore;
+        private Double fusionScore;
+        private Double rerankScore;
+        private List<String> retrievalSources;
 
     }
 }
