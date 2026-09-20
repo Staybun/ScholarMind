@@ -152,6 +152,7 @@ public class VectorSearchService {
         private Double keywordScore;
         private Double fusionScore;
         private Double rerankScore;
+        private String rerankStrategy;
         private List<String> retrievalSources;
 
     }

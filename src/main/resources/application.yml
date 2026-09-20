@@ -90,7 +90,14 @@ rag:
     candidate-top-k: 20
     rrf-k: 60
     rerank-top-k: 12
-    rerank-rrf-weight: 0.7
+    rerank:
+      # OpenAI-compatible endpoint, e.g. http://your-reranker-host:8000/v1
+      base-url: ${BGE_RERANK_BASE_URL:}
+      api-key: ${BGE_RERANK_API_KEY:}
+      model: ${BGE_RERANK_MODEL:BAAI/bge-reranker-v2-m3}
+      timeout-ms: ${BGE_RERANK_TIMEOUT_MS:30000}
+      # Only used when BGE API is unavailable or returns invalid data.
+      fallback-rrf-weight: 0.7
 
 scholarmind:
   context:

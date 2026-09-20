@@ -21,26 +21,29 @@ public class HybridSearchService {
 
     private final VectorSearchService vectorSearchService;
     private final KeywordSearchService keywordSearchService;
+    private final BgeRerankerService bgeRerankerService;
     private final boolean enabled;
     private final int candidateTopK;
     private final int rrfK;
     private final int rerankTopK;
-    private final double rrfWeight;
+    private final double fallbackRrfWeight;
 
     public HybridSearchService(VectorSearchService vectorSearchService,
                                KeywordSearchService keywordSearchService,
+                               BgeRerankerService bgeRerankerService,
                                @Value("${rag.hybrid.enabled:true}") boolean enabled,
                                @Value("${rag.hybrid.candidate-top-k:20}") int candidateTopK,
                                @Value("${rag.hybrid.rrf-k:60}") int rrfK,
                                @Value("${rag.hybrid.rerank-top-k:12}") int rerankTopK,
-                               @Value("${rag.hybrid.rerank-rrf-weight:0.7}") double rrfWeight) {
+                               @Value("${rag.hybrid.rerank.fallback-rrf-weight:0.7}") double fallbackRrfWeight) {
         this.vectorSearchService = vectorSearchService;
         this.keywordSearchService = keywordSearchService;
+        this.bgeRerankerService = bgeRerankerService;
         this.enabled = enabled;
         this.candidateTopK = candidateTopK;
         this.rrfK = rrfK;
         this.rerankTopK = rerankTopK;
-        this.rrfWeight = rrfWeight;
+        this.fallbackRrfWeight = fallbackRrfWeight;
     }
 
     public List<VectorSearchService.SearchResult> search(String query, int topK) {
@@ -77,14 +80,37 @@ public class HybridSearchService {
         List<Candidate> ranked = new ArrayList<>(merged.values());
         ranked.sort(Comparator.comparingDouble((Candidate candidate) -> candidate.rrfScore).reversed());
         int rerankLimit = Math.min(Math.max(rerankTopK, topK), ranked.size());
-        for (int index = 0; index < rerankLimit; index++) {
-            Candidate candidate = ranked.get(index);
-            candidate.rerankScore = rrfWeight * candidate.rrfScore
-                    + (1 - rrfWeight) * lexicalRelevance(query, candidate.result.getContent());
-        }
+        rerank(query, ranked.subList(0, rerankLimit));
         ranked.subList(0, rerankLimit).sort(Comparator.comparingDouble((Candidate candidate) -> candidate.rerankScore).reversed());
 
         return ranked.stream().limit(topK).map(Candidate::toSearchResult).toList();
+    }
+
+    private void rerank(String query, List<Candidate> candidates) {
+        try {
+            List<String> documents = candidates.stream().map(candidate -> candidate.result.getContent()).toList();
+            Map<Integer, Double> scores = new LinkedHashMap<>();
+            for (BgeRerankerService.RerankScore score : bgeRerankerService.rerank(query, documents)) {
+                if (score.index() >= 0 && score.index() < candidates.size()) {
+                    scores.put(score.index(), score.score());
+                }
+            }
+            if (scores.size() != candidates.size()) {
+                throw new BgeRerankerService.RerankUnavailableException("BGE reranker returned incomplete candidate scores");
+            }
+            for (int index = 0; index < candidates.size(); index++) {
+                Candidate candidate = candidates.get(index);
+                candidate.rerankScore = scores.get(index);
+                candidate.rerankStrategy = "BGE_RERANKER_V2_M3";
+            }
+        } catch (BgeRerankerService.RerankUnavailableException exception) {
+            logger.warn("BGE reranker unavailable; using local lexical fallback: {}", exception.getMessage());
+            for (Candidate candidate : candidates) {
+                candidate.rerankScore = fallbackRrfWeight * candidate.rrfScore
+                        + (1 - fallbackRrfWeight) * lexicalRelevance(query, candidate.result.getContent());
+                candidate.rerankStrategy = "LOCAL_LEXICAL_FALLBACK";
+            }
+        }
     }
 
     private double lexicalRelevance(String query, String content) {
@@ -108,6 +134,7 @@ public class HybridSearchService {
         private double keywordScore;
         private double rrfScore;
         private double rerankScore;
+        private String rerankStrategy;
 
         private Candidate(VectorSearchService.SearchResult result) {
             this.result = result;
@@ -120,6 +147,7 @@ public class HybridSearchService {
             result.setKeywordScore(keywordRank == 0 ? null : keywordScore);
             result.setFusionScore(rrfScore);
             result.setRerankScore(rerankScore);
+            result.setRerankStrategy(rerankStrategy);
             result.setRetrievalSources(denseRank > 0 && keywordRank > 0 ? List.of("DENSE", "BM25")
                     : denseRank > 0 ? List.of("DENSE") : List.of("BM25"));
             result.setScore((float) rerankScore);

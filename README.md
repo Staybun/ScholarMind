@@ -76,7 +76,7 @@ Skills 已打包进镜像，修改后重新构建即可生效。Agent 工作目�
 
 ## 混合检索与重排序
 
-论文检索默认启用三段式链路：Milvus 稠密向量召回、内置 BM25 关键词召回、RRF（Reciprocal Rank Fusion）融合，然后对融合候选进行本地词项覆盖与完整短语匹配重排序。结果包含 `retrievalSources`、`denseRank`、`keywordRank`、`denseScore`、`keywordScore`、`fusionScore`、`rerankScore` 字段；`score` 为最终重排序分数，数值越高排名越靠前。
+论文检索默认启用三段式链路：Milvus 稠密向量召回、内置 BM25 关键词召回、RRF（Reciprocal Rank Fusion）融合，然后调用 `BAAI/bge-reranker-v2-m3` API 对融合候选精排。结果包含 `retrievalSources`、`denseRank`、`keywordRank`、`denseScore`、`keywordScore`、`fusionScore`、`rerankScore`、`rerankStrategy` 字段；`score` 为最终重排序分数，数值越高排名越靠前。
 
 BM25 索引在每次论文上传并完成向量入库后更新，服务启动时也会根据 `papers/` 目录中的论文重建。因此，升级后重启服务即可为保留在上传目录中的旧论文补齐关键词索引；仅存在于 Milvus、但已不在上传目录中的旧数据不会进入 BM25 索引。
 
@@ -87,12 +87,19 @@ rag:
     candidate-top-k: 20    # 每个召回器的候选数
     rrf-k: 60              # RRF 常数
     rerank-top-k: 12       # 参与重排序的融合候选数
-    rerank-rrf-weight: 0.7 # 最终分数中 RRF 的权重，剩余部分为词项匹配分数
+    rerank:
+      base-url: ${BGE_RERANK_BASE_URL:} # 例如 http://reranker-host:8000/v1
+      api-key: ${BGE_RERANK_API_KEY:}
+      model: BAAI/bge-reranker-v2-m3
+      timeout-ms: 30000
+      fallback-rrf-weight: 0.7
 ```
+
+配置 `BGE_RERANK_BASE_URL` 后，应用会向 `{base-url}/rerank` 发送 `model`、`query` 和 `documents`，并接受常见的 `results[index,relevance_score]` 或 `results[index,score]` 返回格式。接口应托管 `BAAI/bge-reranker-v2-m3`，例如兼容 `/v1/rerank` 的 vLLM 服务。该模型为多语言 query-document cross-encoder；模型卡和用法见 [BAAI 官方模型页](https://huggingface.co/BAAI/bge-reranker-v2-m3)。
 
 `GET /api/papers/search?query=...&topK=...`、RAG 问答、Agent 的论文知识库工具和 Runtime 上下文证据均使用该混合链路。向量数据库或 Embedding 服务不可用时，系统会记录告警并返回可用的 BM25 结果；BM25 本身依赖上传目录中的可解析论文。
 
-当前重排序器是本地、可解释的词法重排序器，不依赖额外模型 API。若后续接入 cross-encoder 或云端 reranker，应将其作为该融合候选集合的替代重排序实现，并保留证据字段。
+如果 BGE API 未配置、超时、返回非 2xx 或结果缺少候选分数，系统才会使用本地词项覆盖与完整短语匹配重排序降级，并在 `rerankStrategy` 中返回 `LOCAL_LEXICAL_FALLBACK`。BGE API 成功时该字段为 `BGE_RERANKER_V2_M3`。这避免了精排服务的短暂故障阻断论文检索。
 
 ## 本地运行
 
