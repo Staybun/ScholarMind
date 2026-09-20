@@ -3,6 +3,7 @@ package org.example.config;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
@@ -11,6 +12,14 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addViewController("/chat").setViewName("forward:/index.html");
+        registry.addViewController("/papers").setViewName("forward:/index.html");
+        registry.addViewController("/research").setViewName("forward:/index.html");
+        registry.addViewController("/runtime").setViewName("forward:/index.html");
+    }
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {

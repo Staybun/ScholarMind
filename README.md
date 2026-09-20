@@ -1,6 +1,6 @@
 # ScholarMind — 学术论文 Agent 系统
 
-ScholarMind 面向科研论文研读与实验复现规划，提供论文知识问答、研究任务编排、工具调用和分层上下文记忆。
+ScholarMind 是一款面向科研论文研读与实验复现的全栈AI Agent系统，集成Runtime Harness生命周期管理、RAG混合检索、ReAct与多Agent工作流，提供知识问答、研究编排、运行追踪及分层记忆能力。
 
 ## 功能与代码
 
@@ -11,14 +11,36 @@ ScholarMind 面向科研论文研读与实验复现规划，提供论文知识�
 | 单 Agent 与多 Agent | ReAct、Plan-Execute 执行器；Supervisor 协调论文检索、研究问答、实验规划 Agent |
 | MCP 与 Skills | 文件系统、GitHub、arXiv MCP 配置；论文阅读与实验复现 Skills |
 | 上下文与记忆 | `context/`、`memory/`：Token Budget、滑动窗口、历史摘要、Redis 工作记忆、持久化会话及语义记忆 |
+| Web 前端 | `frontend/`：Vue 3、Vite、TypeScript、Vue Router、Element Plus |
+
+## Web 前端
+
+基于Vue 3、TypeScript与Element Plus构建四页面响应式科研工作台，实现流式问答、检索结果展示及Agent运行轨迹可视化
+
+| 路由 | 页面 | 主要能力 |
+| --- | --- | --- |
+| `/chat` | 论文知识问答 | SSE 流式问答、会话记忆域、Markdown 回答 |
+| `/papers` | 论文知识库 | 文档上传、Milvus 状态、Dense + BM25 + RRF + BGE 精排结果 |
+| `/research` | 深度研究工作台 | 多 Agent 研究任务、流式报告、执行阶段反馈 |
+| `/runtime` | Agent 运行台 | 创建、查询和恢复 Run，查看 Checkpoint 与 Trace |
+
+本地前端开发需要 Node.js 22 和 npm。先运行后端，再在另一个终端启动 Vite；`/api` 与 `/milvus` 会代理到 `http://localhost:9900`。
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+开发地址为 <http://localhost:5173>。执行 `npm run typecheck` 检查 TypeScript，执行 `npm run build` 生成 `frontend/dist/`。Docker 构建会自动完成前端安装和生产构建，并把生成文件放入 Spring Boot 的静态资源目录。
 
 
 ## Docker 部署
 
-安装 Docker Engine 或 Docker Desktop（Linux 容器模式）及 Docker Compose v2。无需在宿主机安装 Java、Maven、Milvus 或 Redis；首次构建需要联网下载镜像和 Maven 依赖。
+安装 Docker Engine 或 Docker Desktop（Linux 容器模式）及 Docker Compose v2。无需在宿主机安装 Node.js、Java、Maven、Milvus 或 Redis；首次构建需要联网下载镜像、npm 包和 Maven 依赖。
 
 1. 在项目根目录复制 `.env.example` 为 `.env`（PowerShell：`Copy-Item .env.example .env`；Linux/macOS：`cp .env.example .env`）。
-2. 编辑 `.env`，填写 `DASHSCOPE_API_KEY`。该文件已被 Git 和镜像构建上下文排除，请勿提交真实密钥。缺少或留空密钥时 Compose 会直接报错。
+2. 编辑 `.env`，填写 `DASHSCOPE_API_KEY`。该文件已被 Git 和镜像构建上下文排除，缺少或留空密钥时 Compose 会直接报错。
 3. 在项目根目录运行：
 
 ```bash
@@ -29,7 +51,7 @@ docker compose ps
 
 启动后打开 <http://localhost:9900>。Compose 启动 `app`、`redis`、`milvus`、`etcd` 和 `minio`；应用等待 Redis 和 Milvus 健康后启动。应用健康检查验证 Web 服务可访问，真实模型调用需要有效的 API Key，可在页面上传论文并发起问答验证。
 
-Dockerfile 使用 Maven / Java 17 多阶段构建，构建时执行现有测试，运行镜像以 UID 10001 非 root 用户启动。默认激活 `application-docker.yml`，容器通过服务名连接数据库。实现参考 [Docker 多阶段构建](https://docs.docker.com/build/building/multi-stage/)和 [Compose 启动顺序](https://docs.docker.com/compose/how-tos/startup-order/)。
+Dockerfile 使用 Node.js 22、Maven 和 Java 17 多阶段构建，先生成 Vue 生产包，再将其打入 Spring Boot JAR。运行镜像以 UID 10001 非 root 用户启动。默认激活 `application-docker.yml`，容器通过服务名连接数据库。实现参考 [Docker 多阶段构建](https://docs.docker.com/build/building/multi-stage/)和 [Compose 启动顺序](https://docs.docker.com/compose/how-tos/startup-order/)。
 
 | `.env` 配置 | 默认值 | 用途 |
 | --- | --- | --- |
@@ -111,7 +133,7 @@ docker compose -f vector-database.yml up -d
 mvn spring-boot:run
 ```
 
-打开 <http://localhost:9900> 上传论文并开始研究。默认使用本地 H2 数据库，数据保存在 `data/`；上传文件保存在 `papers/`。MySQL 可通过 `application-mysql.yml` 配置。
+后端启动后，按上面的 Web 前端步骤运行 Vite，并打开 <http://localhost:5173>。默认使用本地 H2 数据库，数据保存在 `data/`；上传文件保存在 `papers/`。MySQL 可通过 `application-mysql.yml` 配置。完整生产页面由 Docker 构建并通过 <http://localhost:9900> 提供。
 
 MCP 默认关闭。安装 Node.js/npx、Docker 和 uv，配置 GitHub token 及 MCP 文件目录后，可启用：
 

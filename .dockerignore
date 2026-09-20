@@ -6,6 +6,8 @@
 !skills/**
 !LICENSE
 !Dockerfile
+!frontend/
+!frontend/**
 .env
 .env.*
 **/*.pem

@@ -59,6 +59,11 @@ uploads/
 /data/
 /papers/
 
+### Vue frontend ###
+/frontend/node_modules/
+/frontend/dist/
+*.tsbuildinfo
+
 ### Local credentials ###
 .env
 .env.*
